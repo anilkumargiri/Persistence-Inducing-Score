@@ -31,7 +31,7 @@ Start by loading libraries and functions
 
 lapply(c("matrixStats","dplyr","reshape","reshape2", "scales", "drc", "caTools","ggplot2", "data.table", "stringr","MESS", "BiocManager","svMisc", "egg", "pheatmap", "sva", "pcaMethods"), library, character.only = T)
 
-source('./PIS.R')
+source('./PIS.R');
 source('./HelperFunctions.R')
 
  PIS calculation example
@@ -61,4 +61,32 @@ df_dose.responses.list <- DOSE_RESPONSE_PROCESS(df_dose.responses, viability = T
 
 Import the control sample DSS profiles
 controls.dss <- read.csv('./controls/File_1_Drugname_response_DSS_10Healthy.txt', header = T, sep = '\t', row.names = 1,stringsAsFactors = F, check.names = F)
+
+Calculate the selective drug response scores(sDSS, zDSS, and rDSS)
+
+# compute the descriptive statistics of DSSs for each drug over 10 controls
+controls.summary <- as.data.frame(rbind(colMeans(as.matrix(controls.dss)),colSds(as.matrix(controls.dss)),colMedians(as.matrix(controls.dss)), colMads(as.matrix(controls.dss))))
+
+# define names of statistics
+rownames(controls.summary ) <- c('mean', 'sd', 'median', 'mad')
+
+# let's set DSS2 as the drug response metrics of patient samples (as an example)
+patients.dss <- as.data.frame(acast(df.metrics,df.metrics$Patient.num ~ df.metrics$drug , value.var  = 'DSS2'))
+
+patients.dss[, 1:3]
+
+##                    1-methyl-D-tryptophan 4-hydroxytamoxifen 8-amino-adenosine
+## AML_003_01                     0                9.2              25.4
+## AML_004_01                     0                2.3              22.6
+## AML_013_01                     0                4.3              23.9
+
+# normalize and scale patient-specific responses to drugs with control DSS profiles
+# patient sDSS
+patients.sdss <- patients.dss - slice(controls.summary['mean', colnames(patients.dss)],rep(1:n(), each = nrow(patients.dss)))
+
+# patient zDSS
+patients.zdss <- (patients.dss - slice(controls.summary['mean', colnames(patients.dss)],rep(1:n(), each = nrow(patients.dss))))/(slice(controls.summary['sd', colnames(patients.dss)],rep(1:n(), each = nrow(patients.dss))) + 1)
+
+# patient rDSS
+patients.rdss <- (patients.dss - slice(controls.summary['median', colnames(patients.dss)],rep(1:n(), each = nrow(patients.dss))))/(slice(controls.summary['mad', colnames(patients.dss)],rep(1:n(), each = nrow(patients.dss))) + 1)
 
