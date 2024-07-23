@@ -39,9 +39,12 @@ Load the example data and compute PIS with CALC_METRICS function updated from Br
 
 
 # load the ex vivo dose-response profiles (cell viability at five drug concentrations)
-df_dose.responses <- read.csv('./exampleData_procedure1.csv', header = T,sep = ',',check.names = F)
+df_dose.responses_CTG <- read.csv('./exampleData_CTG.csv', header = T,sep = ',',check.names = F)
 
-head(df_dose.responses)
+# load the ex vivo dose-response profiles (cell toxicity at five drug concentrations)
+df_dose.responses_CTX <- read.csv('./exampleData_CTX.csv', header = T,sep = ',',check.names = F)
+
+head(df_dose.responses_CTG)
 
 ##    DRUG_NAME CONCENTRATION_nM SCREEN_NAME    CELL_VIABILITY
 ## 1 Nelarabine         10000  AML_013_01            0.3012
@@ -52,41 +55,28 @@ head(df_dose.responses)
 ## 6 Decitabine         10000  AML_013_01            0.4829
 
 # calculate the percentage of growth inhibition 
-df_dose.responses.list <- DOSE_RESPONSE_PROCESS(df_dose.responses, viability = TRUE)
+df_dose.responses.list_CTG <- DOSE_RESPONSE_PROCESS(df_dose.responses_CTG, viability = TRUE)
+# calculate the percentage of cell death
+df_dose.responses.list_CTX <- DOSE_RESPONSE_PROCESS(df_dose.responses_CTX, viability = TRUE)
 
-# calculate DSS metrics (DSS1, DSS2, DSS3), AUC and relative IC50
-df.metrics <- CALC_METRICS(df_dose.responses.list[[1]], df_dose.responses.list[[2]], graph = FALSE)
-# calculate the percentage of growth inhibition 
-df_dose.responses.list <- DOSE_RESPONSE_PROCESS(df_dose.responses, viability = TRUE)
+# calculate DSS metrics (DSS1, DSS2, DSS3), AUC and relative IC50 for growth inhibition (CTG assay)
+df.metrics_CTG <- CALC_METRICS(df_dose.responses.list_CTG[[1]], df_dose.responses.list_CTG[[2]], graph = FALSE)
+# calculate DSS metrics (DSS1, DSS2, DSS3), AUC and relative IC50 for cell death (CTX assay)
+df.metrics_CTX <- CALC_METRICS(df_dose.responses.list_CTX [[1]], df_dose.responses.list_CTX[[2]], graph = FALSE)
 
-Import the control sample DSS profiles
-controls.dss <- read.csv('./controls/File_1_Drugname_response_DSS_10Healthy.txt', header = T, sep = '\t', row.names = 1,stringsAsFactors = F, check.names = F)
 
-Calculate the selective drug response scores(sDSS, zDSS, and rDSS)
 
-# compute the descriptive statistics of DSSs for each drug over 10 controls
-controls.summary <- as.data.frame(rbind(colMeans(as.matrix(controls.dss)),colSds(as.matrix(controls.dss)),colMedians(as.matrix(controls.dss)), colMads(as.matrix(controls.dss))))
+# compute the descriptive statistics of DSSs for each drug over CTG
+df.metrics_CTG_summary <- as.data.frame(rbind(colMeans(as.matrix(df.metrics_CTG)),colSds(as.matrix(df.metrics_CTG)),colMedians(as.matrix(df.metrics_CTG)), colMads(as.matrix(df.metrics_CTG))))
 
 # define names of statistics
-rownames(controls.summary ) <- c('mean', 'sd', 'median', 'mad')
+rownames(df.metrics_CTG_summary  ) <- c('mean', 'sd', 'median', 'mad')
 
-# let's set DSS2 as the drug response metrics of patient samples (as an example)
-patients.dss <- as.data.frame(acast(df.metrics,df.metrics$Patient.num ~ df.metrics$drug , value.var  = 'DSS2'))
+df.metrics_CTX_summary <- as.data.frame(rbind(colMeans(as.matrix(df.metrics_CTX)),colSds(as.matrix(df.metrics_CTX)),colMedians(as.matrix(df.metrics_CTX)), colMads(as.matrix(df.metrics_CTX))))
 
-patients.dss[, 1:3]
+# define names of statistics
+rownames(df.metrics_CTX_summary  ) <- c('mean', 'sd', 'median', 'mad')
 
-##                    1-methyl-D-tryptophan 4-hydroxytamoxifen 8-amino-adenosine
-## AML_003_01                     0                9.2              25.4
-## AML_004_01                     0                2.3              22.6
-## AML_013_01                     0                4.3              23.9
 
-# normalize and scale patient-specific responses to drugs with control DSS profiles
-# patient sDSS
-patients.sdss <- patients.dss - slice(controls.summary['mean', colnames(patients.dss)],rep(1:n(), each = nrow(patients.dss)))
-
-# patient zDSS
-patients.zdss <- (patients.dss - slice(controls.summary['mean', colnames(patients.dss)],rep(1:n(), each = nrow(patients.dss))))/(slice(controls.summary['sd', colnames(patients.dss)],rep(1:n(), each = nrow(patients.dss))) + 1)
-
-# patient rDSS
-patients.rdss <- (patients.dss - slice(controls.summary['median', colnames(patients.dss)],rep(1:n(), each = nrow(patients.dss))))/(slice(controls.summary['mad', colnames(patients.dss)],rep(1:n(), each = nrow(patients.dss))) + 1)
-
+# patient PIS
+patients.PIS <- slice(df.metrics_CTG_summary['mean', rep(1:n())]) - slice(df.metrics_CTX_summary['mean', colnames(df.metrics_CTG_summary)],rep(1:n(), each = nrow(df.metrics_CTG_summary)))
